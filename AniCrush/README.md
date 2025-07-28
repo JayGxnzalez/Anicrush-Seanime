@@ -2,7 +2,7 @@
 
 A streaming provider extension for [Seanime](https://seanime.rahim.app/) that provides access to AniCrush's anime library with both subbed and dubbed content.
 
-## Status: ✅ **WORKING**
+## Status: ✅ **WORKING** - Version 1.1.0
 
 This extension has been thoroughly tested and debugged to work flawlessly with Seanime. All major issues have been resolved.
 
@@ -12,7 +12,7 @@ This extension has been thoroughly tested and debugged to work flawlessly with S
 - **Sub & Dub Support**: Full support for both subtitled and dubbed anime
 - **Robust Error Handling**: Comprehensive error detection and recovery
 - **Episode Discovery**: Handles AniCrush's grouped episode structure
-- **MegaCloud Integration**: Optimized handling of iframe video sources
+- **MegaCloud Integration**: Optimized handling of iframe video sources (now returned as m3u8 type for better Seanime compatibility)
 - **Enhanced Logging**: Detailed console logs for debugging
 
 ## Installation
@@ -97,6 +97,11 @@ The extension provides detailed console logging:
 ### Version 1.0.6
 - Fixed syntax error in provider code
 - Improved error handling
+
+### Version 1.1.0
+- **CRITICAL FIX**: Changed iframe video sources to be returned as m3u8 type for better Seanime video player compatibility
+- This should resolve the "stream is still not playing" issue where iframe sources were not being handled properly
+- No other functionality changes - all existing features remain the same
 
 ### Version 1.0.5
 - Added validation for numeric IDs (unsupported by AniCrush API)

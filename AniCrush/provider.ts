@@ -131,27 +131,27 @@ class Provider {
             continue;
           }
 
-          // Handle iframe type response (MegaCloud, etc.)
-          if (result.type === "iframe" && result.link) {
-            console.log(`[findEpisodeServer] Server ${serverId} returned iframe: ${result.link}`);
-            
-            return {
-              provider: "anicrush",
-              server: `${_server} (Server ${serverId})`,
-              headers: {
-                "Accept": "application/json, text/plain, */*",
-                "Origin": this.base,
-                "Referer": `${this.base}/`,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "x-site": "anicrush",
-              },
-              videoSources: [{
-                quality: "auto",
-                url: result.link,
-                type: "iframe", // Keep as iframe for Seanime to handle properly
-                subtitles: [],
-              }],
-            };
+                      // Handle iframe type response (MegaCloud, etc.)
+            if (result.type === "iframe" && result.link) {
+              console.log(`[findEpisodeServer] Server ${serverId} returned iframe: ${result.link}`);
+              
+              return {
+                provider: "anicrush",
+                server: `${_server} (Server ${serverId})`,
+                headers: {
+                  "Accept": "application/json, text/plain, */*",
+                  "Origin": this.base,
+                  "Referer": `${this.base}/`,
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  "x-site": "anicrush",
+                },
+                videoSources: [{
+                  quality: "auto",
+                  url: result.link,
+                  type: "m3u8", // Change to m3u8 for better Seanime compatibility
+                  subtitles: [],
+                }],
+              };
           }
 
           // Handle direct sources (legacy support)
