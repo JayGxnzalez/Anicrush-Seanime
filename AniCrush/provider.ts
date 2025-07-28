@@ -3,7 +3,7 @@
 class Provider {
   private api = "https://api.anicrush.to";
   private base = "https://anicrush.to";
-  private defaultServer = 4;
+  private availableServers = [4, 1, 3, 5, 6]; // Try multiple servers in order of preference
 
   getSettings(): Settings {
     return {
@@ -88,7 +88,7 @@ class Provider {
         id: `${movieId}/${lang}/${(ep.number ?? ep.episode ?? ep.id ?? 0)}`,
         number: ep.number ?? ep.episode ?? ep.id ?? 0,
         title: ep.name_english || ep.title || ep.name || `Episode ${ep.number ?? ep.episode ?? ep.id ?? 0}`,
-        url: `${this.api}/shared/v2/episode/sources?_movieId=${movieId}&ep=${ep.number ?? ep.episode ?? ep.id ?? 0}&sv=${this.defaultServer}&sc=${lang}`,
+        url: `${movieId}/${lang}/${ep.number ?? ep.episode ?? ep.id ?? 0}`, // Store episode info for server fallback
       }));
     } catch (e: any) {
       console.error("[findEpisodes] error:", e?.message ?? e);
@@ -98,74 +98,111 @@ class Provider {
 
   async findEpisodeServer(episode: EpisodeDetails, _server: string = "AniCrush Server"): Promise<EpisodeServer> {
     try {
-      const data = await this._fetchJSON(episode.url);
-
-      if (!data?.result) {
-        throw new Error("No result in API response");
+      // Parse episode URL to extract movieId, lang, and episode number
+      const urlParts = episode.url.split("/");
+      if (urlParts.length < 3) {
+        throw new Error("Invalid episode URL format");
       }
+      
+      const movieId = urlParts[0];
+      const lang = urlParts[1];
+      const episodeNum = urlParts[2];
 
-      const result = data.result;
+      console.log(`[findEpisodeServer] Trying to find server for ${movieId} episode ${episodeNum} (${lang})`);
 
-      // Handle iframe type response (MegaCloud, etc.)
-      if (result.type === "iframe" && result.link) {
-        return {
-          provider: "anicrush",
-          server: _server,
-          headers: {
-            "Accept": "application/json, text/plain, */*",
-            "Origin": this.base,
-            "Referer": `${this.base}/`,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "x-site": "anicrush",
-          },
-          videoSources: [{
-            quality: "auto",
-            url: result.link,
-            type: "m3u8", // Change from iframe to m3u8 for better compatibility
-            subtitles: [],
-          }],
-        };
-      }
+      // Try multiple servers until we find one that works
+      for (const serverId of this.availableServers) {
+        try {
+          const serverUrl = `${this.api}/shared/v2/episode/sources?_movieId=${movieId}&ep=${episodeNum}&sv=${serverId}&sc=${lang}`;
+          console.log(`[findEpisodeServer] Trying server ${serverId}: ${serverUrl}`);
+          
+          const data = await this._fetchJSON(serverUrl);
 
-      // Handle direct sources (legacy support)
-      const sources = result?.sources ?? [];
-      const tracks = result?.tracks ?? [];
+          if (!data?.status || !data?.result) {
+            console.log(`[findEpisodeServer] Server ${serverId} returned no valid result`);
+            continue;
+          }
 
-      if (!Array.isArray(sources) || sources.length === 0) {
-        throw new Error("No video sources in response");
-      }
+          const result = data.result;
 
-      const videoSources: VideoSource[] = sources
-        .map((s: any) => ({
-          quality: s.label || s.quality || "auto",
-          url: s.file || s.url,
-          type: s.type || (String(s.file || s.url).includes(".m3u8") ? "m3u8" : "mp4"),
-          subtitles: [],
-        }))
-        .filter((v: any) => !!v.url);
+          // Skip servers that return error type
+          if (result.type === "error") {
+            console.log(`[findEpisodeServer] Server ${serverId} returned error type`);
+            continue;
+          }
 
-      // Try attach English subs
-      const eng = Array.isArray(tracks)
-        ? tracks.find((t: any) => (t.kind === "captions" || t.kind === "subtitles") && /english/i.test(t.label || ""))
-        : null;
-      if (eng?.file) {
-        for (const vs of videoSources) {
-          vs.subtitles = [{ url: eng.file, lang: eng.label || "English" }];
+          // Handle iframe type response (MegaCloud, etc.)
+          if (result.type === "iframe" && result.link) {
+            console.log(`[findEpisodeServer] Server ${serverId} returned iframe: ${result.link}`);
+            
+            return {
+              provider: "anicrush",
+              server: `${_server} (Server ${serverId})`,
+              headers: {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": this.base,
+                "Referer": `${this.base}/`,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "x-site": "anicrush",
+              },
+              videoSources: [{
+                quality: "auto",
+                url: result.link,
+                type: "iframe", // Keep as iframe for Seanime to handle properly
+                subtitles: [],
+              }],
+            };
+          }
+
+          // Handle direct sources (legacy support)
+          const sources = result?.sources ?? [];
+          const tracks = result?.tracks ?? [];
+
+          if (Array.isArray(sources) && sources.length > 0) {
+            console.log(`[findEpisodeServer] Server ${serverId} returned ${sources.length} direct sources`);
+            
+            const videoSources: VideoSource[] = sources
+              .map((s: any) => ({
+                quality: s.label || s.quality || "auto",
+                url: s.file || s.url,
+                type: s.type || (String(s.file || s.url).includes(".m3u8") ? "m3u8" : "mp4"),
+                subtitles: [],
+              }))
+              .filter((v: any) => !!v.url);
+
+            // Try attach English subs
+            const eng = Array.isArray(tracks)
+              ? tracks.find((t: any) => (t.kind === "captions" || t.kind === "subtitles") && /english/i.test(t.label || ""))
+              : null;
+            if (eng?.file) {
+              for (const vs of videoSources) {
+                vs.subtitles = [{ url: eng.file, lang: eng.label || "English" }];
+              }
+            }
+
+            return {
+              provider: "anicrush",
+              server: `${_server} (Server ${serverId})`,
+              headers: {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": this.base,
+                "Referer": `${this.base}/`,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "x-site": "anicrush",
+              },
+              videoSources,
+            };
+          }
+
+          console.log(`[findEpisodeServer] Server ${serverId} had no usable sources`);
+        } catch (serverError: any) {
+          console.log(`[findEpisodeServer] Server ${serverId} failed:`, serverError?.message ?? serverError);
+          continue; // Try next server
         }
       }
 
-      return {
-        provider: "anicrush",
-        server: _server,
-        headers: {
-          "Accept": "application/json, text/plain, */*",
-          "Origin": this.base,
-          "Referer": `${this.base}/`,
-          "User-Agent": "Mozilla/5.0",
-          "x-site": "anicrush",
-        },
-        videoSources,
-      };
+      // If all servers failed
+      throw new Error(`No working servers found for episode ${episodeNum}`);
     } catch (e: any) {
       console.error("[findEpisodeServer] error:", e?.message ?? e);
       return {
@@ -183,7 +220,7 @@ class Provider {
         "Accept": "application/json, text/plain, */*",
         "Origin": this.base,
         "Referer": `${this.base}/`,
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "x-site": "anicrush",
       },
     });
