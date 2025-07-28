@@ -38,11 +38,26 @@ class Provider {
 
   async findEpisodes(id: string): Promise<EpisodeDetails[]> {
     try {
-      const [movieId, langPart] = id.split("/");
+      // Handle both ID formats: "movieId/lang" and just "movieId"
+      const idParts = id.split("/");
+      const movieId = idParts[0];
+      const langPart = idParts[1];
       const lang: "dub" | "sub" = (langPart === "dub" || langPart === "sub") ? (langPart as any) : "sub";
+
+      // Validate movieId
+      if (!movieId || movieId.trim().length === 0) {
+        console.error("[findEpisodes] Invalid movieId:", movieId);
+        return [];
+      }
 
       const url = `${this.api}/shared/v2/episode/list?_movieId=${movieId}`;
       const data = await this._fetchJSON(url);
+
+      // Check if API returned an error
+      if (!data?.status) {
+        console.error("[findEpisodes] API error for", movieId, ":", data?.message || "Unknown error");
+        return [];
+      }
 
       // Handle new grouped episode structure
       let episodesArr: any[] = [];
