@@ -4,6 +4,12 @@ class Provider {
   private api = "https://api.anicrush.to";
   private base = "https://anicrush.to";
   private availableServers = [4, 1, 3, 5, 6]; // Try multiple servers in order of preference
+  
+  // Simplified headers like GojoWtf
+  private headers = {
+    "Referer": "https://anicrush.to/",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  };
 
   getSettings(): Settings {
     return {
@@ -20,7 +26,9 @@ class Provider {
       const data = await this._fetchJSON(url);
       const movies = data?.result?.movies ?? data?.result ?? data?.movies ?? [];
 
-      if (!Array.isArray(movies) || movies.length === 0) return [];
+      if (!Array.isArray(movies) || movies.length === 0) {
+        throw new Error("No results found");
+      }
 
       const lang: SubOrDub = query.dub ? "dub" : "sub";
 
@@ -32,7 +40,7 @@ class Provider {
       }));
     } catch (e: any) {
       console.error("[search] error:", e?.message ?? e);
-      return [];
+      throw new Error(e?.message ?? "Search failed");
     }
   }
 
@@ -42,19 +50,16 @@ class Provider {
       const idParts = id.split("/");
       const movieId = idParts[0];
       const langPart = idParts[1];
-      const lang: "dub" | "sub" = (langPart === "dub" || langPart === "sub") ? (langPart as any) : "sub";
+      const lang: "dub" | "sub" = (langPart === "dub" || langPart === "sub") ? langPart : "sub";
 
       // Validate movieId
       if (!movieId || movieId.trim().length === 0) {
-        console.error("[findEpisodes] Invalid movieId:", movieId);
-        return [];
+        throw new Error("Invalid movieId");
       }
 
       // Check if we received a numeric ID (which indicates an issue with Seanime)
       if (/^\d+$/.test(movieId)) {
-        console.error("[findEpisodes] Received numeric ID which is not supported by AniCrush API:", movieId);
-        console.error("[findEpisodes] Please ensure search results are using the correct alphanumeric movie IDs from AniCrush");
-        return [];
+        throw new Error("Received numeric ID which is not supported by AniCrush API");
       }
 
       const url = `${this.api}/shared/v2/episode/list?_movieId=${movieId}`;
@@ -62,8 +67,7 @@ class Provider {
 
       // Check if API returned an error
       if (!data?.status) {
-        console.error("[findEpisodes] API error for", movieId, ":", data?.message || "Unknown error");
-        return [];
+        throw new Error(data?.message || "Failed to fetch episodes");
       }
 
       // Handle new grouped episode structure
@@ -80,8 +84,7 @@ class Provider {
       }
 
       if (!Array.isArray(episodesArr) || episodesArr.length === 0) {
-        console.error("[findEpisodes] no episodes found for", movieId, "raw:", JSON.stringify(data, null, 2));
-        return [];
+        throw new Error("No episodes found");
       }
 
       return episodesArr.map((ep: any) => ({
@@ -92,7 +95,7 @@ class Provider {
       }));
     } catch (e: any) {
       console.error("[findEpisodes] error:", e?.message ?? e);
-      return [];
+      throw new Error(e?.message ?? "Failed to find episodes");
     }
   }
 
@@ -131,43 +134,41 @@ class Provider {
             continue;
           }
 
-          // Handle iframe type response (MegaCloud, etc.)
+          // Handle iframe type response (MegaCloud, etc.) - try to extract direct sources
           if (result.type === "iframe" && result.link) {
             console.log(`[findEpisodeServer] Server ${serverId} returned iframe: ${result.link}`);
             
-            // For now, let's try a simpler approach - return the iframe directly
-            // and let Seanime handle it through its proxy system
-            const videoSources: VideoSource[] = [{
-              quality: "auto",
-              url: result.link,
-              type: "iframe",
-              subtitles: [],
-            }];
-
-            console.log(`[findEpisodeServer] Returning iframe source for server ${serverId}`);
+            try {
+              // Try to extract direct sources from MegaCloud
+              const extractedSources = await this._extractMegaCloudSources(result.link);
+              
+              if (extractedSources && extractedSources.length > 0) {
+                console.log(`[findEpisodeServer] Successfully extracted ${extractedSources.length} direct sources from MegaCloud`);
+                
+                return {
+                  provider: "anicrush",
+                  server: `${_server} (Server ${serverId})`,
+                  headers: this.headers,
+                  videoSources: extractedSources,
+                };
+              }
+            } catch (extractError: any) {
+              console.log(`[findEpisodeServer] MegaCloud extraction failed:`, extractError?.message ?? extractError);
+            }
+            
+            // Fallback to iframe if extraction fails
+            console.log(`[findEpisodeServer] Falling back to iframe for server ${serverId}`);
             
             return {
               provider: "anicrush",
               server: `${_server} (Server ${serverId})`,
-              headers: {
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Cache-Control": "no-cache",
-                "Pragma": "no-cache",
-                "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                "Sec-Ch-Ua-Mobile": "?0",
-                "Sec-Ch-Ua-Platform": '"Windows"',
-                "Sec-Fetch-Dest": "iframe",
-                "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-Site": "cross-site",
-                "Upgrade-Insecure-Requests": "1",
-                "Origin": this.base,
-                "Referer": `${this.base}/`,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "x-site": "anicrush",
-              },
-              videoSources,
+              headers: this.headers,
+              videoSources: [{
+                quality: "auto",
+                url: result.link,
+                type: "iframe",
+                subtitles: [],
+              }],
             };
           }
 
@@ -179,12 +180,17 @@ class Provider {
             console.log(`[findEpisodeServer] Server ${serverId} returned ${sources.length} direct sources`);
             
             const videoSources: VideoSource[] = sources
-              .map((s: any) => ({
-                quality: s.label || s.quality || "auto",
-                url: s.file || s.url,
-                type: s.type || (String(s.file || s.url).includes(".m3u8") ? "m3u8" : "mp4"),
-                subtitles: [],
-              }))
+              .map((s: any) => {
+                // Clean URL like GojoWtf does
+                const cleanUrl = (s.file || s.url)?.replace(/[\r\n]+/g, '').trim();
+                
+                return {
+                  quality: s.label || s.quality || "auto",
+                  url: cleanUrl,
+                  type: s.type || (String(cleanUrl).includes(".m3u8") ? "m3u8" : "mp4"),
+                  subtitles: [],
+                };
+              })
               .filter((v: VideoSource) => !!v.url);
 
             // Try attach English subs
@@ -200,13 +206,7 @@ class Provider {
             return {
               provider: "anicrush",
               server: `${_server} (Server ${serverId})`,
-              headers: {
-                "Accept": "application/json, text/plain, */*",
-                "Origin": this.base,
-                "Referer": `${this.base}/`,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "x-site": "anicrush",
-              },
+              headers: this.headers,
               videoSources,
             };
           }
@@ -222,12 +222,7 @@ class Provider {
       throw new Error(`No working servers found for episode ${episodeNum}`);
     } catch (e: any) {
       console.error("[findEpisodeServer] error:", e?.message ?? e);
-      return {
-        provider: "anicrush",
-        server: _server,
-        headers: {},
-        videoSources: [],
-      };
+      throw new Error(e?.message ?? "Failed to find episode server");
     }
   }
 
@@ -236,24 +231,13 @@ class Provider {
     await new Promise(resolve => setTimeout(resolve, 100));
     
     const res = await fetch(url, {
-      headers: {
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "Origin": this.base,
-        "Referer": `${this.base}/`,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "x-site": "anicrush",
-      },
+      headers: this.headers,
     });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
     return await res.json();
   }
 
@@ -265,10 +249,8 @@ class Provider {
       const iframeResponse = await fetch(iframeUrl, {
         headers: {
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.5",
-          "Accept-Encoding": "gzip, deflate, br",
           "Referer": this.base + "/",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "User-Agent": this.headers["User-Agent"],
         },
       });
 
@@ -294,7 +276,6 @@ class Provider {
         /\/ajax\/embed-4\/getSources\?id=([^"&\s]+)/,
         /"ajax\/embed-4\/getSources\?id=([^"&\s]+)"/,
         /getSources\?id=([^"&\s]+)/,
-        // Try with the extracted video ID directly
         new RegExp(`getSources\\?id=${videoId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
       ];
 
@@ -306,7 +287,7 @@ class Provider {
         if (match) {
           extractedId = match[1] || videoId;
           megaCloudApiUrl = `https://megacloud.blog/ajax/embed-4/getSources?id=${extractedId}`;
-          console.log(`[_extractMegaCloudSources] Found MegaCloud API URL with pattern: ${megaCloudApiUrl}`);
+          console.log(`[_extractMegaCloudSources] Found MegaCloud API URL: ${megaCloudApiUrl}`);
           break;
         }
       }
@@ -318,120 +299,57 @@ class Provider {
       }
 
       // Try to call the MegaCloud API
-      try {
-        const sourcesResponse = await fetch(megaCloudApiUrl, {
-          headers: {
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Referer": iframeUrl,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        });
+      const sourcesResponse = await fetch(megaCloudApiUrl, {
+        headers: {
+          "Accept": "application/json, text/javascript, */*; q=0.01",
+          "Referer": iframeUrl,
+          "User-Agent": this.headers["User-Agent"],
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
 
-        console.log(`[_extractMegaCloudSources] API response status: ${sourcesResponse.status}`);
+      console.log(`[_extractMegaCloudSources] API response status: ${sourcesResponse.status}`);
 
-        if (sourcesResponse.ok) {
-          const sourcesData = await sourcesResponse.json();
-          console.log(`[_extractMegaCloudSources] MegaCloud API response:`, JSON.stringify(sourcesData).substring(0, 500));
-          
-          if (sourcesData.sources && Array.isArray(sourcesData.sources)) {
-            const videoSources: VideoSource[] = sourcesData.sources.map((source: any) => ({
+      if (sourcesResponse.ok) {
+        const sourcesData = await sourcesResponse.json();
+        console.log(`[_extractMegaCloudSources] MegaCloud API response:`, JSON.stringify(sourcesData).substring(0, 500));
+        
+        if (sourcesData.sources && Array.isArray(sourcesData.sources)) {
+          const videoSources: VideoSource[] = sourcesData.sources.map((source: any) => {
+            // Clean URL like GojoWtf does
+            const cleanUrl = source.file?.replace(/[\r\n]+/g, '').trim();
+            
+            return {
               quality: source.label || "auto",
-              url: source.file,
-              type: source.file && source.file.includes(".m3u8") ? "m3u8" : "mp4",
+              url: cleanUrl,
+              type: cleanUrl && cleanUrl.includes(".m3u8") ? "m3u8" : "mp4",
               subtitles: [],
-            })).filter((vs: VideoSource) => vs.url);
+            };
+          }).filter((vs: VideoSource) => vs.url);
 
-            // Add subtitles if available
-            if (sourcesData.tracks && Array.isArray(sourcesData.tracks)) {
-              const engSub = sourcesData.tracks.find((track: any) => 
-                track.kind === "captions" && /eng/i.test(track.label || "")
-              );
-              if (engSub && engSub.file) {
-                videoSources.forEach(vs => {
-                  vs.subtitles = [{ url: engSub.file, lang: engSub.label || "English" }];
-                });
-              }
-            }
-
-            if (videoSources.length > 0) {
-              console.log(`[_extractMegaCloudSources] Successfully extracted ${videoSources.length} video sources from API`);
-              return videoSources;
+          // Add subtitles if available
+          if (sourcesData.tracks && Array.isArray(sourcesData.tracks)) {
+            const engSub = sourcesData.tracks.find((track: any) => 
+              track.kind === "captions" && /eng/i.test(track.label || "")
+            );
+            if (engSub && engSub.file) {
+              videoSources.forEach(vs => {
+                vs.subtitles = [{ url: engSub.file, lang: engSub.label || "English" }];
+              });
             }
           }
-        } else {
-          console.log(`[_extractMegaCloudSources] API call failed with status: ${sourcesResponse.status}`);
-        }
-      } catch (apiError: any) {
-        console.log(`[_extractMegaCloudSources] API call error:`, apiError?.message ?? apiError);
-      }
 
-      // Fallback 1: Look for direct video URLs in the HTML with various patterns
-      console.log(`[_extractMegaCloudSources] Trying HTML parsing fallbacks...`);
-      
-      const videoPatterns = [
-        /file\s*:\s*"([^"]*\.m3u8[^"]*)"/,
-        /"file"\s*:\s*"([^"]*\.m3u8[^"]*)"/,
-        /source\s*:\s*"([^"]*\.m3u8[^"]*)"/,
-        /"source"\s*:\s*"([^"]*\.m3u8[^"]*)"/,
-        /src\s*:\s*"([^"]*\.m3u8[^"]*)"/,
-        /"src"\s*:\s*"([^"]*\.m3u8[^"]*)"/,
-        /file\s*:\s*"([^"]*\.mp4[^"]*)"/,
-        /"file"\s*:\s*"([^"]*\.mp4[^"]*)"/,
-        /source\s*:\s*"([^"]*\.mp4[^"]*)"/,
-        /"source"\s*:\s*"([^"]*\.mp4[^"]*)"/,
-        /src\s*:\s*"([^"]*\.mp4[^"]*)"/,
-        /"src"\s*:\s*"([^"]*\.mp4[^"]*)"/,
-      ];
-
-      for (const pattern of videoPatterns) {
-        const match = iframeHtml.match(pattern);
-        if (match && match[1]) {
-          const videoUrl = match[1];
-          const videoType = videoUrl.includes(".m3u8") ? "m3u8" : "mp4";
-          console.log(`[_extractMegaCloudSources] Found ${videoType.toUpperCase()} URL in HTML: ${videoUrl}`);
-          
-          return [{
-            quality: "auto",
-            url: videoUrl,
-            type: videoType,
-            subtitles: [],
-          }];
+          if (videoSources.length > 0) {
+            console.log(`[_extractMegaCloudSources] Successfully extracted ${videoSources.length} video sources from API`);
+            return videoSources;
+          }
         }
       }
-
-      // Fallback 2: Look for any HTTP/HTTPS URLs that might be video streams
-      console.log(`[_extractMegaCloudSources] Trying generic URL patterns...`);
-      
-      const genericPatterns = [
-        /https?:\/\/[^"\s]+\.m3u8[^"\s]*/g,
-        /https?:\/\/[^"\s]+\.mp4[^"\s]*/g,
-      ];
-
-      for (const pattern of genericPatterns) {
-        const matches = iframeHtml.match(pattern);
-        if (matches && matches.length > 0) {
-          const videoUrl = matches[0];
-          const videoType = videoUrl.includes(".m3u8") ? "m3u8" : "mp4";
-          console.log(`[_extractMegaCloudSources] Found generic ${videoType.toUpperCase()} URL: ${videoUrl}`);
-          
-          return [{
-            quality: "auto",
-            url: videoUrl,
-            type: videoType,
-            subtitles: [],
-          }];
-        }
-      }
-
-      // Log a sample of the HTML for debugging
-      console.log(`[_extractMegaCloudSources] HTML sample (first 1000 chars):`, iframeHtml.substring(0, 1000));
-      console.log(`[_extractMegaCloudSources] HTML sample (last 1000 chars):`, iframeHtml.substring(Math.max(0, iframeHtml.length - 1000)));
 
       throw new Error("No video sources found in MegaCloud iframe");
     } catch (error: any) {
       console.error(`[_extractMegaCloudSources] Error:`, error?.message ?? error);
-      return [];
+      throw error; // Re-throw to allow fallback to iframe
     }
   }
 }
