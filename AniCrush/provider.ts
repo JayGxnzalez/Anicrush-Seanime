@@ -21,54 +21,85 @@ class Provider {
   async search(query: SearchOptions): Promise<SearchResult[]> {
     try {
       const originalQuery = query.query;
-      const searchTerms = [originalQuery];
+      const searchTerms = [];
       
-      // Add variations for common title formats
-      if (originalQuery.includes("THE ANIMATION")) {
-        searchTerms.push(originalQuery.replace(" THE ANIMATION", ""));
-        searchTerms.push(originalQuery.replace("THE ANIMATION", ""));
+      // Always try lowercase first (AniCrush seems to prefer lowercase)
+      searchTerms.push(originalQuery.toLowerCase());
+      
+      // Try original case if different from lowercase
+      if (originalQuery !== originalQuery.toLowerCase()) {
+        searchTerms.push(originalQuery);
       }
       
-      // Special handling for CITY THE ANIMATION
-      if (originalQuery.toUpperCase().includes("CITY")) {
-        searchTerms.push("CITY");
-        searchTerms.push("City");
-        searchTerms.push("city");
-      }
+      // Add variations for common title patterns
+      const lowerQuery = originalQuery.toLowerCase();
       
-      // Try each search term
-      for (const searchTerm of searchTerms) {
-        try {
-          const q = encodeURIComponent(searchTerm.trim());
-          const url = `${this.api}/shared/v2/movie/list?keyword=${q}&limit=24&page=1`;
-
-          const data = await this._fetchJSON(url);
-          const movies = data?.result?.movies ?? data?.result ?? data?.movies ?? [];
-
-          if (Array.isArray(movies) && movies.length > 0) {
-            const lang: SubOrDub = query.dub ? "dub" : "sub";
-
-            const results = movies.map((m: any) => ({
-              id: `${m.id}/${lang}`, // Use alphanumeric ID (correct format)
-              title: m.name_english || m.name,
-              url: `${this.base}/watch/${m.slug}.${m.id}`,
-              subOrDub: lang,
-            }));
-            
-            console.log(`[search] Found ${results.length} results for "${searchTerm}"`);
-            return results;
+      // Remove common suffixes that might not be in AniCrush
+      const suffixesToRemove = [
+        " the animation",
+        " (tv)",
+        " season 1", " season 2", " season 3", " season 4", " season 5",
+        " s1", " s2", " s3", " s4", " s5",
+        " part 1", " part 2", " part 3",
+        " cour 1", " cour 2"
+      ];
+      
+      for (const suffix of suffixesToRemove) {
+        if (lowerQuery.includes(suffix)) {
+          const withoutSuffix = lowerQuery.replace(suffix, "").trim();
+          if (withoutSuffix && !searchTerms.includes(withoutSuffix)) {
+            searchTerms.push(withoutSuffix);
           }
-        } catch (searchError) {
-          console.log(`[search] Failed to search for "${searchTerm}":`, searchError?.message ?? searchError);
-          continue; // Try next search term
         }
       }
       
-      // If no search terms worked
-      throw new Error("No results found for any search variation");
-    } catch (e: any) {
-      console.error("[search] error:", e?.message ?? e);
-      throw new Error(e?.message ?? "Search failed");
+      // Try romanized versions (replace common patterns)
+      const romanizedQuery = lowerQuery
+        .replace(/ō/g, "ou")
+        .replace(/ū/g, "uu")
+        .replace(/ā/g, "aa")
+        .replace(/ē/g, "ee")
+        .replace(/ī/g, "ii");
+      
+      if (romanizedQuery !== lowerQuery && !searchTerms.includes(romanizedQuery)) {
+        searchTerms.push(romanizedQuery);
+      }
+      
+      // Try each search term until we find results
+      for (const searchTerm of searchTerms) {
+        try {
+          console.log(`[search] Trying search term: "${searchTerm}"`);
+          
+          const q = encodeURIComponent(searchTerm);
+          const searchUrl = `https://api.anicrush.to/shared/v2/movie/list?keyword=${q}&limit=24&page=1`;
+          const searchResponse = await this._fetchJSON(searchUrl);
+          
+          if (searchResponse.data && searchResponse.data.length > 0) {
+            console.log(`[search] Found ${searchResponse.data.length} results for: "${searchTerm}"`);
+            
+            const results = searchResponse.data.map(item => ({
+              id: item._id,
+              title: item.title,
+              url: `https://anicrush.to/watch/${item.slug}`,
+              subOrDub: query.dubbed ? "dub" : "sub"
+            }));
+            
+            return results;
+          } else {
+            console.log(`[search] No results for: "${searchTerm}"`);
+          }
+        } catch (error: any) {
+          console.log(`[search] Error with term "${searchTerm}": ${error.message}`);
+          continue;
+        }
+      }
+      
+      // If no search terms worked, throw error
+      throw new Error(`No results found for any search variation of: ${originalQuery}`);
+      
+    } catch (error: any) {
+      console.error(`[search] error: ${error.message}`);
+      throw new Error(error.message);
     }
   }
 
