@@ -25,7 +25,7 @@ class Provider {
       const lang: SubOrDub = query.dub ? "dub" : "sub";
 
       return movies.map((m: any) => ({
-        id: `${m.id}/${lang}`,
+        id: `${m.id}/${lang}`, // Use alphanumeric ID (correct format)
         title: m.name_english || m.name,
         url: `${this.base}/watch/${m.slug}.${m.id}`,
         subOrDub: lang,
@@ -47,6 +47,13 @@ class Provider {
       // Validate movieId
       if (!movieId || movieId.trim().length === 0) {
         console.error("[findEpisodes] Invalid movieId:", movieId);
+        return [];
+      }
+
+      // Check if we received a numeric ID (which indicates an issue with Seanime)
+      if (/^\d+$/.test(movieId)) {
+        console.error("[findEpisodes] Received numeric ID which is not supported by AniCrush API:", movieId);
+        console.error("[findEpisodes] Please ensure search results are using the correct alphanumeric movie IDs from AniCrush");
         return [];
       }
 

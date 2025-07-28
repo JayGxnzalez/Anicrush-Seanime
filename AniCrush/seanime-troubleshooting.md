@@ -2,23 +2,47 @@
 
 ## Issue: `findEpisodes` returns `[]` in Seanime Playground
 
-If you're getting an empty array `[]` when testing `findEpisodes` in the Seanime playground, here are the steps to diagnose and fix the issue:
+### 🚨 **COMMON ISSUE: Numeric ID Error**
+
+**Error Message**: `error > [findEpisodes] API error for 1 : Movie not found`
+
+This error indicates that Seanime is passing a numeric ID (like `"1"`) instead of the correct alphanumeric AniCrush movie ID (like `"d1YCXh"`).
+
+### ✅ **SOLUTION**
+
+The issue is that you're using an incorrect movie ID format. Here's how to fix it:
 
 ### ✅ **CONFIRMED WORKING**
 The provider has been thoroughly tested and works correctly. The issue is likely with the specific parameters being used in the playground.
 
 ### 🔍 **Diagnostic Steps**
 
-#### 1. **Check the Movie ID Format**
-The `findEpisodes` function expects an ID in one of these formats:
-- `"movieId/sub"` - For subtitle version
-- `"movieId/dub"` - For dubbed version  
-- `"movieId"` - Will default to subtitle version
+#### 1. **How to Get the Correct Movie ID**
 
-**Example working IDs:**
+**🔍 Use the Search Function First**:
+- Test the `search` method with a query like `{ query: "naruto" }`
+- This will return results with the correct IDs
+
+**📋 Example Search Result**:
+```json
+{
+  "id": "d1YCXh/sub",
+  "title": "Naruto", 
+  "url": "https://anicrush.to/watch/naruto.d1YCXh",
+  "subOrDub": "sub"
+}
+```
+
+**✅ WORKING IDs (from actual search results)**:
 - `"d1YCXh/sub"` - Naruto (sub)
-- `"d1YCXh/dub"` - Naruto (dub)
-- `"d1YCXh"` - Naruto (defaults to sub)
+- `"d1YCXh/dub"` - Naruto (dub)  
+- `"112HuM/sub"` - Boruto: Naruto the Movie
+- `"3yIGN5/sub"` - The Last: Naruto the Movie
+
+**❌ INCORRECT IDs (will fail)**:
+- `"1"` - Numeric IDs don't work
+- `"677"` - id_number field is not supported  
+- Any purely numeric ID
 
 #### 2. **Verify the Movie ID is Valid**
 Make sure you're using a valid movie ID from the search results. You can get valid IDs by:
