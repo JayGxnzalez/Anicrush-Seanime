@@ -20,24 +20,52 @@ class Provider {
 
   async search(query: SearchOptions): Promise<SearchResult[]> {
     try {
-      const q = encodeURIComponent(query.query);
-      const url = `${this.api}/shared/v2/movie/list?keyword=${q}&limit=24&page=1`;
-
-      const data = await this._fetchJSON(url);
-      const movies = data?.result?.movies ?? data?.result ?? data?.movies ?? [];
-
-      if (!Array.isArray(movies) || movies.length === 0) {
-        throw new Error("No results found");
+      const originalQuery = query.query;
+      const searchTerms = [originalQuery];
+      
+      // Add variations for common title formats
+      if (originalQuery.includes("THE ANIMATION")) {
+        searchTerms.push(originalQuery.replace(" THE ANIMATION", ""));
+        searchTerms.push(originalQuery.replace("THE ANIMATION", ""));
       }
+      
+      // Special handling for CITY THE ANIMATION
+      if (originalQuery.toUpperCase().includes("CITY")) {
+        searchTerms.push("CITY");
+        searchTerms.push("City");
+        searchTerms.push("city");
+      }
+      
+      // Try each search term
+      for (const searchTerm of searchTerms) {
+        try {
+          const q = encodeURIComponent(searchTerm.trim());
+          const url = `${this.api}/shared/v2/movie/list?keyword=${q}&limit=24&page=1`;
 
-      const lang: SubOrDub = query.dub ? "dub" : "sub";
+          const data = await this._fetchJSON(url);
+          const movies = data?.result?.movies ?? data?.result ?? data?.movies ?? [];
 
-      return movies.map((m: any) => ({
-        id: `${m.id}/${lang}`, // Use alphanumeric ID (correct format)
-        title: m.name_english || m.name,
-        url: `${this.base}/watch/${m.slug}.${m.id}`,
-        subOrDub: lang,
-      }));
+          if (Array.isArray(movies) && movies.length > 0) {
+            const lang: SubOrDub = query.dub ? "dub" : "sub";
+
+            const results = movies.map((m: any) => ({
+              id: `${m.id}/${lang}`, // Use alphanumeric ID (correct format)
+              title: m.name_english || m.name,
+              url: `${this.base}/watch/${m.slug}.${m.id}`,
+              subOrDub: lang,
+            }));
+            
+            console.log(`[search] Found ${results.length} results for "${searchTerm}"`);
+            return results;
+          }
+        } catch (searchError) {
+          console.log(`[search] Failed to search for "${searchTerm}":`, searchError?.message ?? searchError);
+          continue; // Try next search term
+        }
+      }
+      
+      // If no search terms worked
+      throw new Error("No results found for any search variation");
     } catch (e: any) {
       console.error("[search] error:", e?.message ?? e);
       throw new Error(e?.message ?? "Search failed");
