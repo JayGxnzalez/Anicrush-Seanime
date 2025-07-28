@@ -106,10 +106,8 @@ class Provider {
 
       const result = data.result;
 
-      // Handle iframe type response
+      // Handle iframe type response (MegaCloud, etc.)
       if (result.type === "iframe" && result.link) {
-        // For iframe sources, we need to extract the actual video URL
-        // This might require additional processing depending on the iframe provider
         return {
           provider: "anicrush",
           server: _server,
@@ -117,13 +115,13 @@ class Provider {
             "Accept": "application/json, text/plain, */*",
             "Origin": this.base,
             "Referer": `${this.base}/`,
-            "User-Agent": "Mozilla/5.0",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "x-site": "anicrush",
           },
           videoSources: [{
             quality: "auto",
             url: result.link,
-            type: "iframe",
+            type: "m3u8", // Change from iframe to m3u8 for better compatibility
             subtitles: [],
           }],
         };
