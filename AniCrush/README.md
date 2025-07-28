@@ -37,7 +37,8 @@ A streaming provider extension for [Seanime](https://seanime.rahim.app/) that pr
 **"Server not loading" or "Stream not playing"**
 - The extension now uses a simplified approach that returns iframe URLs directly
 - Seanime's proxy system handles the iframe playback automatically
-- If issues persist, try switching between sub/dub options
+- **v1.5.0+ includes anti-Cloudflare bot detection headers** to bypass security measures
+- If issues persist, try switching between sub/dub options or wait a few minutes between attempts
 
 **"No episodes found"**
 - Make sure the anime title matches what's available on AniCrush
@@ -64,7 +65,8 @@ The extension provides detailed logging that can be viewed in Seanime's console:
 
 ## Version History
 
-- **v1.4.0** (Current): Simplified iframe approach for better compatibility with Seanime proxy system
+- **v1.5.0** (Current): Enhanced anti-Cloudflare bot detection headers and request timing
+- **v1.4.0**: Simplified iframe approach for better compatibility with Seanime proxy system
 - **v1.3.0**: Full MegaCloud extraction implementation with comprehensive fallbacks
 - **v1.2.0**: Enhanced MegaCloud source extraction with multiple API patterns
 - **v1.1.1**: Improved multi-server fallback logic
