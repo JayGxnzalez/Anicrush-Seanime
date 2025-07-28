@@ -135,69 +135,29 @@ class Provider {
           if (result.type === "iframe" && result.link) {
             console.log(`[findEpisodeServer] Server ${serverId} returned iframe: ${result.link}`);
             
-            try {
-              // Extract actual video stream from MegaCloud iframe
-              const videoSources = await this._extractMegaCloudSources(result.link);
-              
-              if (videoSources && videoSources.length > 0) {
-                console.log(`[findEpisodeServer] Successfully extracted ${videoSources.length} video sources from MegaCloud`);
-                
-                return {
-                  provider: "anicrush",
-                  server: `${_server} (Server ${serverId})`,
-                  headers: {
-                    "Accept": "application/json, text/plain, */*",
-                    "Origin": this.base,
-                    "Referer": `${this.base}/`,
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "x-site": "anicrush",
-                  },
-                  videoSources,
-                };
-              } else {
-                console.log(`[findEpisodeServer] Failed to extract sources from MegaCloud iframe, falling back to iframe`);
-                
-                // Fallback to iframe if extraction fails
-                return {
-                  provider: "anicrush",
-                  server: `${_server} (Server ${serverId})`,
-                  headers: {
-                    "Accept": "application/json, text/plain, */*",
-                    "Origin": this.base,
-                    "Referer": `${this.base}/`,
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "x-site": "anicrush",
-                  },
-                  videoSources: [{
-                    quality: "auto",
-                    url: result.link,
-                    type: "iframe",
-                    subtitles: [],
-                  }],
-                };
-              }
-            } catch (extractError: any) {
-              console.log(`[findEpisodeServer] MegaCloud extraction failed:`, extractError?.message ?? extractError);
-              
-              // Fallback to iframe if extraction fails
-              return {
-                provider: "anicrush",
-                server: `${_server} (Server ${serverId})`,
-                headers: {
-                  "Accept": "application/json, text/plain, */*",
-                  "Origin": this.base,
-                  "Referer": `${this.base}/`,
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                  "x-site": "anicrush",
-                },
-                videoSources: [{
-                  quality: "auto",
-                  url: result.link,
-                  type: "iframe",
-                  subtitles: [],
-                }],
-              };
-            }
+            // For now, let's try a simpler approach - return the iframe directly
+            // and let Seanime handle it through its proxy system
+            const videoSources: VideoSource[] = [{
+              quality: "auto",
+              url: result.link,
+              type: "iframe",
+              subtitles: [],
+            }];
+
+            console.log(`[findEpisodeServer] Returning iframe source for server ${serverId}`);
+            
+            return {
+              provider: "anicrush",
+              server: `${_server} (Server ${serverId})`,
+              headers: {
+                "Accept": "application/json, text/plain, */*",
+                "Origin": this.base,
+                "Referer": `${this.base}/`,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "x-site": "anicrush",
+              },
+              videoSources,
+            };
           }
 
           // Handle direct sources (legacy support)
@@ -214,7 +174,7 @@ class Provider {
                 type: s.type || (String(s.file || s.url).includes(".m3u8") ? "m3u8" : "mp4"),
                 subtitles: [],
               }))
-              .filter((v: any) => !!v.url);
+              .filter((v: VideoSource) => !!v.url);
 
             // Try attach English subs
             const eng = Array.isArray(tracks)

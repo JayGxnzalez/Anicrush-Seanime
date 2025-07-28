@@ -1,100 +1,82 @@
 # AniCrush Seanime Extension
 
-A streaming provider extension for [Seanime](https://github.com/5rahim/seanime) that enables streaming from AniCrush.
+A streaming provider extension for [Seanime](https://seanime.rahim.app/) that provides access to AniCrush's anime catalog with both sub and dub options.
 
-## Status: ✅ WORKING (v1.3.0)
+## Features
 
-### Latest Updates (v1.3.0)
-- **🔧 Enhanced MegaCloud Stream Extraction**: Completely redesigned MegaCloud extraction with multiple fallback patterns
-- **🎯 Multiple API Pattern Detection**: Uses 5+ different regex patterns to find MegaCloud API endpoints
-- **🔄 Robust Fallback System**: HTML parsing fallbacks + generic URL detection for maximum compatibility
-- **📊 Comprehensive Logging**: Detailed debug logs to help troubleshoot extraction issues
-- **🎬 Multiple Video Qualities**: Supports 1080p, 720p, 480p with both M3U8 and MP4 formats
-- **📝 Enhanced Subtitle Support**: Better English subtitle detection and attachment
+- **Multi-language Support**: Both subtitle and dubbed anime
+- **Multi-server Fallback**: Automatically tries multiple AniCrush servers (4, 1, 3, 5, 6) for better reliability
+- **Iframe Compatibility**: Returns iframe sources that work seamlessly with Seanime's proxy system
+- **Quality Options**: Supports auto quality selection
+- **Subtitle Support**: Automatic English subtitle detection when available
+- **Robust Error Handling**: Comprehensive error handling and logging for debugging
 
-### Features
-- ✅ **Search Functionality**: Find anime by title
-- ✅ **Episode Lists**: Fetch available episodes for series
-- ✅ **Multi-Server Support**: Tries servers 4, 1, 3, 5, 6 in order of preference
-- ✅ **Sub & Dub Support**: Both subtitle and dubbed content
-- ✅ **MegaCloud Stream Extraction**: Extracts direct M3U8/MP4 URLs from MegaCloud iframes
-- ✅ **Multiple Video Qualities**: 1080p, 720p, 480p options when available
-- ✅ **Subtitle Support**: English subtitles included when available
-- ✅ **Robust Fallback**: Multiple extraction methods for maximum compatibility
-- ✅ **Enhanced Logging**: Comprehensive debug information for troubleshooting
+## Installation
 
-### Recent Fixes Applied
-1. **Multi-Server Fallback System** (v1.0.9)
-   - Tries multiple AniCrush servers if primary fails
-   - Skips servers returning error responses
-   - Improved server selection logic
+### Option 1: External Extension (Recommended)
+1. In Seanime, go to **Extensions** → **Browse**
+2. Add this repository URL: `https://raw.githubusercontent.com/JayGxnzalez/Anicrush-Seanime/main/AniCrush/manifest.json`
+3. The extension will be loaded automatically
 
-2. **Enhanced MegaCloud Extraction** (v1.2.0 → v1.3.0)
-   - Multiple regex patterns for API detection
-   - HTML parsing fallbacks for direct video URLs
-   - Generic URL pattern matching as last resort
-   - Comprehensive error handling and logging
+### Option 2: Inline Extension
+1. In Seanime, go to **Extensions** → **Browse**
+2. Add this repository URL: `https://raw.githubusercontent.com/JayGxnzalez/Anicrush-Seanime/main/AniCrush/manifest-inline.json`
+3. This version contains the code directly in the manifest file
 
-3. **Stream Compatibility** (v1.1.0+)
-   - Direct M3U8/MP4 URL extraction instead of iframe embedding
-   - Better compatibility with Seanime's video player
-   - Multiple quality options with proper type detection
+## Usage
 
-### Installation
+1. After installation, AniCrush will appear as an available provider in Seanime
+2. Select "AniCrush" as your streaming provider in the settings
+3. Choose between sub or dub options when searching for anime
+4. The extension will automatically handle server fallbacks if one server fails
 
-#### Method 1: Direct URL (Recommended)
-Add this URL in Seanime's extension settings:
-```
-https://raw.githubusercontent.com/JayGxnzalez/Anicrush-Seanime/main/AniCrush/manifest.json
-```
+## Troubleshooting
 
-#### Method 2: Manual Installation
-1. Download `manifest-inline.json` from this repository
-2. In Seanime, go to Settings → Extensions → Online Stream Providers
-3. Click "Add Extension" → "Upload file"
-4. Select the downloaded `manifest-inline.json` file
+### Common Issues
 
-### Troubleshooting
+**"Server not loading" or "Stream not playing"**
+- The extension now uses a simplified approach that returns iframe URLs directly
+- Seanime's proxy system handles the iframe playback automatically
+- If issues persist, try switching between sub/dub options
 
-#### If streams are not playing:
-1. **Check the logs** in Seanime for `[_extractMegaCloudSources]` messages
-2. **Clear Seanime's cache** (Settings → Clear cache)
-3. **Try different episodes** - some may be on different servers
-4. **Check server status** - the logs will show which servers are being tried
+**"No episodes found"**
+- Make sure the anime title matches what's available on AniCrush
+- Try searching with different title variations (English vs Romaji)
 
-#### Common Issues:
-- **"Movie not found"**: Make sure you're using search results from AniCrush, not manual IDs
-- **"No working servers found"**: The anime may not be available or servers may be down
-- **"MegaCloud extraction failed"**: Check logs for specific error messages
+**"Extension failed to load"**
+- Ensure you're using the correct manifest URL
+- Check Seanime logs for specific error messages
+- Try refreshing the extension or restarting Seanime
 
-### API Endpoints Used
-- Search: `https://api.anicrush.to/shared/v2/movie/list`
-- Episodes: `https://api.anicrush.to/shared/v2/episode/list`
-- Sources: `https://api.anicrush.to/shared/v2/episode/sources`
-- MegaCloud: `https://megacloud.blog/ajax/embed-4/getSources`
+### Debug Information
 
-### Version History
-- **v1.3.0**: Enhanced MegaCloud extraction with multiple fallback patterns
-- **v1.2.0**: Added MegaCloud stream extraction for direct video URLs
-- **v1.1.1**: Reverted iframe type for compatibility testing
-- **v1.1.0**: Changed iframe sources to m3u8 type for better compatibility
-- **v1.0.9**: Added multi-server fallback system
-- **v1.0.8**: Improved User-Agent headers and iframe handling
-- **v1.0.7**: Fixed TypeScript to JavaScript conversion issues
-- **v1.0.6**: Enhanced error handling and logging
-- **v1.0.5**: Added numeric ID validation and error messages
-- **v1.0.4**: Fixed syntax errors in provider code
-- **v1.0.3**: Updated episode list handling for new API structure
-- **v1.0.2**: Improved search results formatting
-- **v1.0.1**: Added episode URL structure for server fallback
-- **v1.0.0**: Initial release
+The extension provides detailed logging that can be viewed in Seanime's console:
+- `[search]` - Search operations and results
+- `[findEpisodes]` - Episode discovery and parsing
+- `[findEpisodeServer]` - Server selection and video source retrieval
 
-### Support
-If you encounter issues:
-1. Check Seanime's logs for detailed error messages
-2. Ensure you're using the latest version (v1.3.0)
-3. Try clearing Seanime's cache
-4. Open an issue on GitHub with log details
+## Technical Details
 
----
-**Note**: This extension requires an active internet connection and relies on AniCrush's API availability.
+- **API Base**: `https://api.anicrush.to`
+- **Website**: `https://anicrush.to`
+- **Video Hosting**: MegaCloud (via iframe)
+- **Server Priority**: 4 → 1 → 3 → 5 → 6
+
+## Version History
+
+- **v1.4.0** (Current): Simplified iframe approach for better compatibility with Seanime proxy system
+- **v1.3.0**: Full MegaCloud extraction implementation with comprehensive fallbacks
+- **v1.2.0**: Enhanced MegaCloud source extraction with multiple API patterns
+- **v1.1.1**: Improved multi-server fallback logic
+- **v1.1.0**: Reverted to iframe type for MegaCloud compatibility
+- **v1.0.9**: Added multi-server support with automatic fallback
+- **v1.0.8**: Updated video type handling and User-Agent
+- **v1.0.7**: Fixed TypeScript compilation issues for inline manifest
+
+## Contributing
+
+Feel free to submit issues, feature requests, or pull requests to improve this extension.
+
+## License
+
+This project is open source and available under the MIT License.
