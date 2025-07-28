@@ -1,6 +1,6 @@
 # AniCrush – Seanime Online Streaming Provider
 
-**Version 1.0.3** - Fixed and Fully Compatible with Seanime PC Application
+**Version 1.0.4** - Fixed and Fully Compatible with Seanime PC Application
 
 ## ✅ Status: FULLY WORKING
 
@@ -116,7 +116,8 @@ If you encounter any issues:
 
 ## 🔄 Version History
 
-- **v1.0.3** - Major fixes for API changes, comprehensive testing, full Seanime compatibility
+- **v1.0.4** - Fixed TypeScript compilation syntax error
+- **v1.0.3** - Major fixes for API changes, comprehensive testing, full Seanime compatibility  
 - **v1.0.2** - Previous version with API compatibility issues
 - **v1.0.1** - Initial release
 

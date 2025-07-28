@@ -2,7 +2,7 @@
   "id": "anicrush",
   "name": "AniCrush",
   "description": "AniCrush streaming provider (sub & dub) for Seanime",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": "JayGxnzalez",
   "type": "onlinestream-provider",
   "language": "typescript",
