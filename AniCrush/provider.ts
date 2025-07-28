@@ -45,12 +45,18 @@ class Provider {
       const url = `${this.api}/shared/v2/episode/list?_movieId=${movieId}`;
       const data = await this._fetchJSON(url);
 
-      const episodesArr =
-        data?.result?.episodes ??
-        data?.result?.data ??
-        data?.result ??
-        data?.episodes ??
-        [];
+      // Handle new grouped episode structure
+      let episodesArr: any[] = [];
+      
+      if (data?.result) {
+        // Episodes are now grouped by ranges like "001 - 100", "101 - 200", etc.
+        const result = data.result;
+        for (const key of Object.keys(result)) {
+          if (Array.isArray(result[key])) {
+            episodesArr = episodesArr.concat(result[key]);
+          }
+        }
+      }
 
       if (!Array.isArray(episodesArr) || episodesArr.length === 0) {
         console.error("[findEpisodes] no episodes found for", movieId, "raw:", JSON.stringify(data, null, 2));
@@ -60,7 +66,7 @@ class Provider {
       return episodesArr.map((ep: any) => ({
         id: `${movieId}/${lang}/${(ep.number ?? ep.episode ?? ep.id ?? 0)}`,
         number: ep.number ?? ep.episode ?? ep.id ?? 0,
-        title: ep.title ? String(ep.title) : `Episode ${ep.number ?? ep.episode ?? ep.id ?? 0}`,
+        title: ep.name_english || ep.title || ep.name || `Episode ${ep.number ?? ep.episode ?? ep.id ?? 0}`,
         url: `${this.api}/shared/v2/episode/sources?_movieId=${movieId}&ep=${ep.number ?? ep.episode ?? ep.id ?? 0}&sv=${this.defaultServer}&sc=${lang}`,
       }));
     } catch (e: any) {
@@ -73,9 +79,38 @@ class Provider {
     try {
       const data = await this._fetchJSON(episode.url);
 
-      const root = data?.result ?? data?.data ?? data;
-      const sources = root?.sources ?? root?.data?.sources ?? [];
-      const tracks = root?.tracks ?? root?.data?.tracks ?? [];
+      if (!data?.result) {
+        throw new Error("No result in API response");
+      }
+
+      const result = data.result;
+
+      // Handle iframe type response
+      if (result.type === "iframe" && result.link) {
+        // For iframe sources, we need to extract the actual video URL
+        // This might require additional processing depending on the iframe provider
+        return {
+          provider: "anicrush",
+          server: _server,
+          headers: {
+            "Accept": "application/json, text/plain, */*",
+            "Origin": this.base,
+            "Referer": `${this.base}/`,
+            "User-Agent": "Mozilla/5.0",
+            "x-site": "anicrush",
+          },
+          videoSources: [{
+            quality: "auto",
+            url: result.link,
+            type: "iframe",
+            subtitles: [],
+          }],
+        };
+      }
+
+      // Handle direct sources (legacy support)
+      const sources = result?.sources ?? [];
+      const tracks = result?.tracks ?? [];
 
       if (!Array.isArray(sources) || sources.length === 0) {
         throw new Error("No video sources in response");
