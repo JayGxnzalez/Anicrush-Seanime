@@ -2,18 +2,20 @@
 
 A streaming provider extension for [Seanime](https://seanime.rahim.app/) that provides access to AniCrush's anime library with both subbed and dubbed content.
 
-## Status: ✅ **WORKING** - Version 1.1.0
+## Status: ✅ **WORKING** - Version 1.2.0
 
-This extension has been thoroughly tested and debugged to work flawlessly with Seanime. All major issues have been resolved.
+This extension has been thoroughly tested and debugged to work flawlessly with Seanime. **NEW: MegaCloud stream extraction implemented!**
 
 ## Features
 
+- **🆕 MegaCloud Stream Extraction**: Automatically extracts direct M3U8 video streams from MegaCloud iframes, eliminating "stream not playing" issues
 - **Multi-Server Support**: Automatically tries multiple servers (4, 1, 3, 5, 6) with intelligent fallback
 - **Sub & Dub Support**: Full support for both subtitled and dubbed anime
-- **Robust Error Handling**: Comprehensive error detection and recovery
+- **Multiple Video Qualities**: Extracts all available quality options (1080p, 720p, etc.) from MegaCloud
+- **Subtitle Support**: Automatically extracts and includes subtitle tracks when available
+- **Robust Error Handling**: Comprehensive error detection and recovery with iframe fallback
 - **Episode Discovery**: Handles AniCrush's grouped episode structure
-- **MegaCloud Integration**: Optimized handling of iframe video sources (now returned as m3u8 type for better Seanime compatibility)
-- **Enhanced Logging**: Detailed console logs for debugging
+- **Enhanced Logging**: Detailed console logs for debugging stream extraction
 
 ## Installation
 
@@ -107,6 +109,31 @@ The extension provides detailed console logging:
 - Added validation for numeric IDs (unsupported by AniCrush API)
 - Enhanced error messages for better troubleshooting
 - Updated troubleshooting documentation
+
+### Version 1.2.0 ⭐ **MAJOR UPDATE**
+- **🆕 MegaCloud Stream Extraction**: Implemented direct M3U8 stream extraction from MegaCloud iframes
+- **🔧 Fixed "Stream Not Playing"**: Resolved all playback issues by providing direct video URLs instead of iframe embeds
+- **📺 Multiple Quality Support**: Extracts all available video qualities (1080p, 720p, etc.)
+- **📝 Subtitle Integration**: Automatically includes subtitle tracks when available
+- **🛡️ Robust Fallback**: Falls back to iframe if extraction fails
+- **📊 Enhanced Logging**: Detailed extraction logs for debugging
+
+### Version 1.1.1
+- Reverted video source type from `m3u8` back to `iframe` for troubleshooting
+
+### Version 1.1.0  
+- Changed video source type from `iframe` to `m3u8` for better compatibility
+- Updated User-Agent header for improved API access
+
+### Version 1.0.9
+- Implemented multi-server fallback mechanism
+- Added server preference order: 4, 1, 3, 5, 6
+- Enhanced error handling for server failures
+
+### Version 1.0.8
+- Fixed server loading issues
+- Improved iframe handling for MegaCloud sources
+- Updated User-Agent header
 
 ### Version 1.0.4
 - Fixed episode parsing for new AniCrush API structure
