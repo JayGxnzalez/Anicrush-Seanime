@@ -63,6 +63,10 @@ jsCode = jsCode.replace(/const videoSources:\s*=/, 'const videoSources =');
 jsCode = jsCode.replace(/let episodesArr\[\]\s*=/, 'let episodesArr =');
 jsCode = jsCode.replace(/const videoSources\[\]\s*=/, 'const videoSources =');
 
+// Fix more complex array syntax issues
+jsCode = jsCode.replace(/const\s+(\w+)\[\]\s*=/, 'const $1 =');
+jsCode = jsCode.replace(/let\s+(\w+)\[\]\s*=/, 'let $1 =');
+
 // Fix remaining type annotations in variable declarations
 jsCode = jsCode.replace(/:\s*VideoSource\[\]/g, '');
 jsCode = jsCode.replace(/:\s*EpisodeDetails\[\]/g, '');
