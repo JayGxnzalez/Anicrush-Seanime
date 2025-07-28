@@ -6,6 +6,5 @@
   "author": "JayGxnzalez",
   "type": "onlinestream-provider",
   "language": "typescript",
-  "lang": "en",
   "payloadUri": "https://raw.githubusercontent.com/JayGxnzalez/Anicrush-Seanime/main/AniCrush/provider.ts"
 }
