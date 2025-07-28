@@ -227,9 +227,6 @@ class Provider {
   }
 
   private async _fetchJSON(url: string): Promise<any> {
-    // Small delay to avoid triggering rate limits
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
     const res = await fetch(url, {
       headers: this.headers,
     });
