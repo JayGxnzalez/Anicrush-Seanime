@@ -295,7 +295,7 @@ class Provider {
       const iframeHtml = await iframeResponse.text();
       console.log(`[_extractMegaCloudSources] Iframe HTML length: ${iframeHtml.length}`);
 
-      // Extract the video ID from the iframe URL or HTML
+      // Extract the video ID from the iframe URL
       const videoIdMatch = iframeUrl.match(/\/e-1\/([^?]+)/);
       if (!videoIdMatch) {
         throw new Error("Could not extract video ID from iframe URL");
@@ -304,12 +304,37 @@ class Provider {
       const videoId = videoIdMatch[1];
       console.log(`[_extractMegaCloudSources] Extracted video ID: ${videoId}`);
 
-      // Try to find MegaCloud API endpoints in the iframe HTML
-      const apiUrlMatch = iframeHtml.match(/ajax\/embed-4\/getSources\?id=([^"&]+)/);
-      if (apiUrlMatch) {
-        const megaCloudApiUrl = `https://megacloud.blog/ajax/embed-4/getSources?id=${apiUrlMatch[1]}`;
-        console.log(`[_extractMegaCloudSources] Found MegaCloud API URL: ${megaCloudApiUrl}`);
-        
+      // Try multiple patterns to find MegaCloud API endpoints
+      const apiPatterns = [
+        /ajax\/embed-4\/getSources\?id=([^"&\s]+)/,
+        /\/ajax\/embed-4\/getSources\?id=([^"&\s]+)/,
+        /"ajax\/embed-4\/getSources\?id=([^"&\s]+)"/,
+        /getSources\?id=([^"&\s]+)/,
+        // Try with the extracted video ID directly
+        new RegExp(`getSources\\?id=${videoId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+      ];
+
+      let megaCloudApiUrl = null;
+      let extractedId = null;
+
+      for (const pattern of apiPatterns) {
+        const match = iframeHtml.match(pattern);
+        if (match) {
+          extractedId = match[1] || videoId;
+          megaCloudApiUrl = `https://megacloud.blog/ajax/embed-4/getSources?id=${extractedId}`;
+          console.log(`[_extractMegaCloudSources] Found MegaCloud API URL with pattern: ${megaCloudApiUrl}`);
+          break;
+        }
+      }
+
+      // If no pattern matched, try with the video ID from URL
+      if (!megaCloudApiUrl) {
+        megaCloudApiUrl = `https://megacloud.blog/ajax/embed-4/getSources?id=${videoId}`;
+        console.log(`[_extractMegaCloudSources] Using video ID from URL: ${megaCloudApiUrl}`);
+      }
+
+      // Try to call the MegaCloud API
+      try {
         const sourcesResponse = await fetch(megaCloudApiUrl, {
           headers: {
             "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -319,9 +344,11 @@ class Provider {
           },
         });
 
+        console.log(`[_extractMegaCloudSources] API response status: ${sourcesResponse.status}`);
+
         if (sourcesResponse.ok) {
           const sourcesData = await sourcesResponse.json();
-          console.log(`[_extractMegaCloudSources] MegaCloud API response:`, JSON.stringify(sourcesData).substring(0, 200));
+          console.log(`[_extractMegaCloudSources] MegaCloud API response:`, JSON.stringify(sourcesData).substring(0, 500));
           
           if (sourcesData.sources && Array.isArray(sourcesData.sources)) {
             const videoSources: VideoSource[] = sourcesData.sources.map((source: any) => ({
@@ -343,34 +370,79 @@ class Provider {
               }
             }
 
-            console.log(`[_extractMegaCloudSources] Successfully extracted ${videoSources.length} video sources`);
-            return videoSources;
+            if (videoSources.length > 0) {
+              console.log(`[_extractMegaCloudSources] Successfully extracted ${videoSources.length} video sources from API`);
+              return videoSources;
+            }
           }
+        } else {
+          console.log(`[_extractMegaCloudSources] API call failed with status: ${sourcesResponse.status}`);
+        }
+      } catch (apiError: any) {
+        console.log(`[_extractMegaCloudSources] API call error:`, apiError?.message ?? apiError);
+      }
+
+      // Fallback 1: Look for direct video URLs in the HTML with various patterns
+      console.log(`[_extractMegaCloudSources] Trying HTML parsing fallbacks...`);
+      
+      const videoPatterns = [
+        /file\s*:\s*"([^"]*\.m3u8[^"]*)"/,
+        /"file"\s*:\s*"([^"]*\.m3u8[^"]*)"/,
+        /source\s*:\s*"([^"]*\.m3u8[^"]*)"/,
+        /"source"\s*:\s*"([^"]*\.m3u8[^"]*)"/,
+        /src\s*:\s*"([^"]*\.m3u8[^"]*)"/,
+        /"src"\s*:\s*"([^"]*\.m3u8[^"]*)"/,
+        /file\s*:\s*"([^"]*\.mp4[^"]*)"/,
+        /"file"\s*:\s*"([^"]*\.mp4[^"]*)"/,
+        /source\s*:\s*"([^"]*\.mp4[^"]*)"/,
+        /"source"\s*:\s*"([^"]*\.mp4[^"]*)"/,
+        /src\s*:\s*"([^"]*\.mp4[^"]*)"/,
+        /"src"\s*:\s*"([^"]*\.mp4[^"]*)"/,
+      ];
+
+      for (const pattern of videoPatterns) {
+        const match = iframeHtml.match(pattern);
+        if (match && match[1]) {
+          const videoUrl = match[1];
+          const videoType = videoUrl.includes(".m3u8") ? "m3u8" : "mp4";
+          console.log(`[_extractMegaCloudSources] Found ${videoType.toUpperCase()} URL in HTML: ${videoUrl}`);
+          
+          return [{
+            quality: "auto",
+            url: videoUrl,
+            type: videoType,
+            subtitles: [],
+          }];
         }
       }
 
-      // Fallback: look for direct video URLs in the HTML
-      const m3u8Match = iframeHtml.match(/file:"([^"]*\.m3u8[^"]*)"/);
-      if (m3u8Match) {
-        console.log(`[_extractMegaCloudSources] Found M3U8 URL in HTML: ${m3u8Match[1]}`);
-        return [{
-          quality: "auto",
-          url: m3u8Match[1],
-          type: "m3u8",
-          subtitles: [],
-        }];
+      // Fallback 2: Look for any HTTP/HTTPS URLs that might be video streams
+      console.log(`[_extractMegaCloudSources] Trying generic URL patterns...`);
+      
+      const genericPatterns = [
+        /https?:\/\/[^"\s]+\.m3u8[^"\s]*/g,
+        /https?:\/\/[^"\s]+\.mp4[^"\s]*/g,
+      ];
+
+      for (const pattern of genericPatterns) {
+        const matches = iframeHtml.match(pattern);
+        if (matches && matches.length > 0) {
+          const videoUrl = matches[0];
+          const videoType = videoUrl.includes(".m3u8") ? "m3u8" : "mp4";
+          console.log(`[_extractMegaCloudSources] Found generic ${videoType.toUpperCase()} URL: ${videoUrl}`);
+          
+          return [{
+            quality: "auto",
+            url: videoUrl,
+            type: videoType,
+            subtitles: [],
+          }];
+        }
       }
 
-      const mp4Match = iframeHtml.match(/file:"([^"]*\.mp4[^"]*)"/);
-      if (mp4Match) {
-        console.log(`[_extractMegaCloudSources] Found MP4 URL in HTML: ${mp4Match[1]}`);
-        return [{
-          quality: "auto",
-          url: mp4Match[1],
-          type: "mp4",
-          subtitles: [],
-        }];
-      }
+      // Log a sample of the HTML for debugging
+      console.log(`[_extractMegaCloudSources] HTML sample (first 1000 chars):`, iframeHtml.substring(0, 1000));
+      console.log(`[_extractMegaCloudSources] HTML sample (last 1000 chars):`, iframeHtml.substring(Math.max(0, iframeHtml.length - 1000)));
 
       throw new Error("No video sources found in MegaCloud iframe");
     } catch (error: any) {
